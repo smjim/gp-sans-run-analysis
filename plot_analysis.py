@@ -37,7 +37,7 @@ def plot_counts_vs_time(selected_runs, roi_list):
         plt.legend(loc='upper right')
 
         plt.tight_layout()
-        plt.savefig(f'{settings.output_dir}{roi_str}_plot.pdf', format='pdf')
+        plt.savefig(f'{settings.output_dir}{roi_str}_counts_plot.pdf', format='pdf')
         plt.show()
 
 def plot_countrates_vs_time(selected_runs, roi_list):
@@ -67,10 +67,10 @@ def plot_countrates_vs_time(selected_runs, roi_list):
 
         plt.xlabel('Start Time [Hrs]')
         plt.ylabel(roi_str + ' Count Rate [$hours^{-1}$]')
-        plt.title('Counts vs. Start Time')
+        plt.title('Count Rate vs. Start Time')
         plt.legend(loc='upper right')
 
         plt.tight_layout()
-        plt.savefig(f'{settings.output_dir}{roi_str}_plot.pdf', format='pdf')
+        plt.savefig(f'{settings.output_dir}{roi_str}_countRate_plot.pdf', format='pdf')
         plt.show()
 

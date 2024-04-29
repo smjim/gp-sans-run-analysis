@@ -2,7 +2,7 @@
 # Data paths 
 run_summary_file = '../../DATA/ONCAT_summary_HFIR_CG2_IPTS-27957.csv'
 data_dir = '../../DATA/processed_data/' # Preprocessed data using scripts from https://github.com/smjim/mcStas_optimization_reduction
-output_dir = '../figures-analysis/'
+output_dir = './output/'
 
 # Define ROI limits 
 # Pixel definition [x0 x1 y0 y1]
