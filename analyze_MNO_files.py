@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import os
 
+import settings
+
 # Calculate Sum within ROI for given ROI and input file 
 def calculate_roi_sum(file, square=None, circle=None, oval=None, show=False):
 
@@ -163,6 +165,69 @@ def find_ROI_counts(selected_runs, ROI_list, data_dir):
 			ROI_sum, ROI_sum_err = calculate_roi_sum(file, square=ROI, show=False)
 			# Extract run number from file name
 			run_number = os.path.basename(file).split('_')[2]
+			# Update selected_runs_appended with ROI sum for corresponding run
+			selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_string] = ROI_sum
+			selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_err_string] = ROI_sum_err
+			print(f'{run_number} {roi_string}: {ROI_sum}, {ROI_sum_err}')
+		print(f' ======== {roi_string} Done. ========')
+	
+	return selected_runs_appended
+
+# Calculate sum within ROI for set of "selected runs" (Pandas DataFrame) Using MNO datafiles instead of preprocessed files
+def find_ROI_counts_MNO(selected_runs, ROI_list, data_dir):
+	"""
+	Function to select runs from the run summary DataFrame based on given |B| values.
+
+	Parameters:
+		selected_runs (DataFrame): DataFrame containing selected run summary data.
+		ROI_list (array): Contains [Rectangular ROI limits [x0, x1, y0, y1]] [DataFrame column header for ROI sum output] [DataFrame column header for ROI sum err output]
+		data_dir (string): Name of directory containing McStas-format data files to be analyzed.
+
+	Returns:
+		selected_runs (DataFrame): DataFram now has extra column containing calculated ROI counts.
+	"""
+
+	mno_dir = os.path.join(settings.data_dir, 'MNO_files')
+	processed_outdir = os.path.join(settings.data_dir, 'processed_data')
+
+	if not os.path.exists(mno_dir):
+		print('Please help us find your MNO files!')
+	if not os.path.exists(processed_outdir):
+		os.makedirs(processed_outdir)
+
+	selected_runs_appended = selected_runs.copy()
+
+	selected_files = []
+
+	# Iterate through selected runs to find corresponding MNO files
+	for run_number in selected_runs['Run #']:
+		# Construct file path for each run
+		file_path = os.path.join(mno_dir, f'MNO_GPSANS_{run_number}.txt')
+		# Check if file exists
+		if os.path.exists(file_path):
+			selected_files.append(file_path)
+		else:
+			print(f"File not found for run {run_number}: {file_path}")
+	
+	print(ROI_list)
+	for (ROI, roi_string, roi_err_string) in ROI_list:
+	
+		print(f' ======== Analyzing {roi_string} ========')
+		# Find counts within rectangular ROI limits for each MNO file
+		for file in selected_files:
+			# Extract run number from file name
+			run_number = (os.path.basename(file).split('_')[2]).split('.')[0]
+
+			processed_outfile = os.path.join(processed_outdir, f'reduced_xbin_{run_number}.txt')
+			if not os.path.exists(processed_outfile):
+				# Preprocess MNO datafiles
+				run_duration = os.system(f"python3 preprocess/extract_duration.py {settings.run_summary_file} {run_number}")
+				detIDmap_file = os.path.join(settings.data_dir, 'DetIDmap.csv')
+
+				os.system(f"./MNO_to_intensity.out {file} {detIDmap_file} {processed_outfile} {run_duration}")
+			
+			ROI_sum, ROI_sum_err = calculate_roi_sum(processed_outfile, square=ROI, show=False)
+
 			# Update selected_runs_appended with ROI sum for corresponding run
 			selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_string] = ROI_sum
 			selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_err_string] = ROI_sum_err

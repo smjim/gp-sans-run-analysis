@@ -11,7 +11,7 @@ import pandas as pd
 
 import settings
 
-from analyze_MNO_files import find_ROI_counts
+from analyze_MNO_files import * 
 from plot_analysis import *
 
 ## Define functions
@@ -71,14 +71,17 @@ def main():
 	run_summary['Start Time Elapsed [Hours]'], run_summary['Duration [Hours]'] = parse_start_time(run_summary)
 	
 	# Filter and select runs 
-	selected_runs = run_summary[run_summary['Field'].isin(settings.B_select)]					# Select runs by |B| values in B_select list
+	selected_runs = run_summary.copy()
+	selected_runs = selected_runs[selected_runs['Field'].isin(settings.B_select)]				# Select runs by |B| values in B_select list
 	selected_runs = selected_runs[selected_runs['Duration [Hours]'] > settings.min_duration]	# Filter runs by minimum duration
+	selected_runs = selected_runs[selected_runs['Ramping'] == settings.ramping_included] 		# Choose whether to include ramping runs
 
 	# Calculate counts/ ROI for each ROI definition
 	ROI_list = [[settings.ROI_0, 'ROI 0', 'ROI 0 Err'],
 				[settings.ROI_1, 'ROI 1', 'ROI 1 Err'],
 				[settings.ROI_2, 'ROI 2', 'ROI 2 Err']]
-	selected_runs = find_ROI_counts(selected_runs, ROI_list, settings.data_dir)
+	selected_runs = find_ROI_counts_MNO(selected_runs, ROI_list, settings.data_dir)
+	#selected_runs = find_ROI_counts(selected_runs, ROI_list, settings.data_dir)
 	
 	# Plot counts vs. time for selected runs
 	plot_counts_vs_time(selected_runs, ROI_list)
