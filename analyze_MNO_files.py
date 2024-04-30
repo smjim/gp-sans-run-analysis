@@ -127,6 +127,48 @@ def calculate_roi_sum(file, square=None, circle=None, oval=None, show=False):
 	
 	return roi_sum, roi_sum_err
 
+def BM_intensity_MNO(MNO_filename):
+	"""
+	Extract BM intensity data from a TSV .dat file.
+
+	Parameters:
+		MNO_filename (str): Path to the TSV .dat file.
+
+	Returns:
+		np.ndarray: 2D array containing time and counts.
+	"""
+	# Initialize lists to store time and intensity values
+	time_list = []
+	intensity_list = []
+
+	# Open the file and read line by line
+	with open(MNO_filename, 'r') as file:
+		# Skip the header lines
+		for _ in range(5):
+			next(file)
+
+		# Iterate through each line in the file
+		for line in file:
+			# Split the line by comma to extract values
+			values = line.strip().split(',')
+			# Check if the Detector ID is 2048
+			if values[2].strip() == '2048':
+				# Extract time and intensity values
+				time = float(values[1].strip())  # Relative Time
+				intensity = float(values[3].strip())  # Value
+				# Append time and intensity to the respective lists
+				time_list.append(time)
+				intensity_list.append(intensity)
+
+	# Convert lists to numpy arrays
+	time_array = np.array(time_list)
+	intensity_array = np.array(intensity_list)
+
+	# Combine time and intensity arrays column-wise
+	data_array = np.column_stack((time_array, intensity_array))
+
+	return data_array
+
 # Calculate sum within ROI for set of "selected runs" (Pandas DataFrame)
 def find_ROI_counts(selected_runs, ROI_list, data_dir):
 	"""
@@ -176,7 +218,7 @@ def find_ROI_counts(selected_runs, ROI_list, data_dir):
 # Calculate sum within ROI for set of "selected runs" (Pandas DataFrame) Using MNO datafiles instead of preprocessed files
 def find_ROI_counts_MNO(selected_runs, ROI_list, data_dir):
 	"""
-	Function to select runs from the run summary DataFrame based on given |B| values.
+	Function to find counts in different ROI's for all selected runs
 
 	Parameters:
 		selected_runs (DataFrame): DataFrame containing selected run summary data.
@@ -187,14 +229,6 @@ def find_ROI_counts_MNO(selected_runs, ROI_list, data_dir):
 		selected_runs (DataFrame): DataFram now has extra column containing calculated ROI counts.
 	"""
 
-	mno_dir = os.path.join(settings.data_dir, 'MNO_files')
-	processed_outdir = os.path.join(settings.data_dir, 'processed_data')
-
-	if not os.path.exists(mno_dir):
-		print('Please help us find your MNO files!')
-	if not os.path.exists(processed_outdir):
-		os.makedirs(processed_outdir)
-
 	selected_runs_appended = selected_runs.copy()
 
 	selected_files = []
@@ -202,7 +236,7 @@ def find_ROI_counts_MNO(selected_runs, ROI_list, data_dir):
 	# Iterate through selected runs to find corresponding MNO files
 	for run_number in selected_runs['Run #']:
 		# Construct file path for each run
-		file_path = os.path.join(mno_dir, f'MNO_GPSANS_{run_number}.txt')
+		file_path = os.path.join(settings.mno_dir, f'MNO_GPSANS_{run_number}.txt')
 		# Check if file exists
 		if os.path.exists(file_path):
 			selected_files.append(file_path)
@@ -218,7 +252,7 @@ def find_ROI_counts_MNO(selected_runs, ROI_list, data_dir):
 			# Extract run number from file name
 			run_number = (os.path.basename(file).split('_')[2]).split('.')[0]
 
-			processed_outfile = os.path.join(processed_outdir, f'reduced_xbin_{run_number}.txt')
+			processed_outfile = os.path.join(settings.processed_outdir, f'reduced_xbin_{run_number}.txt')
 			if not os.path.exists(processed_outfile):
 				# Preprocess MNO datafiles
 				run_duration = os.system(f"python3 preprocess/extract_duration.py {settings.run_summary_file} {run_number}")
@@ -233,5 +267,172 @@ def find_ROI_counts_MNO(selected_runs, ROI_list, data_dir):
 			selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_err_string] = ROI_sum_err
 			print(f'{run_number} {roi_string}: {ROI_sum}, {ROI_sum_err}')
 		print(f' ======== {roi_string} Done. ========')
+	
+	return selected_runs_appended
+
+# Calculate average BM intensity 
+# MNO tube 2048 gives counts/ 16667us
+def find_BM_intensity_MNO(selected_runs):
+	"""
+	Function to find BM average intensity for all selected runs.
+
+	Parameters:
+		selected_runs (DataFrame): DataFrame containing selected run summary data.
+		data_dir (string): Name of directory containing McStas-format data files to be analyzed.
+
+	Returns:
+		selected_runs (DataFrame): DataFram now has extra column containing calculated average BM intensity. 
+	"""
+
+	selected_runs_appended = selected_runs.copy()
+
+	selected_files = []
+
+	# Iterate through selected runs to find corresponding MNO files
+	for run_number in selected_runs['Run #']:
+		# Construct file path for each run
+		file_path = os.path.join(settings.mno_dir, f'MNO_GPSANS_{run_number}.txt')
+		# Check if file exists
+		if os.path.exists(file_path):
+			selected_files.append(file_path)
+		else:
+			print(f"File not found for run {run_number}: {file_path}")
+	
+	print(f' ======== Analyzing BM Intensity ========')
+	for file in selected_files:
+		# Extract run number from file name
+		run_number = (os.path.basename(file).split('_')[2]).split('.')[0]
+		
+		BM_intensity = BM_intensity_MNO(file) # Intensity per 16667us 
+		BM_intensity_avg = np.mean(BM_intensity[:,1])
+
+		# Update selected_runs_appended with bm_intensity_avg for corresponding run
+		selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity'] = BM_intensity_avg 
+		print(f'{run_number} BM Intensity Avg: {BM_intensity_avg}')
+	print(f' ======== BM Intensity Analysis Done. ========')
+	
+	return selected_runs_appended
+
+# Calculate sum within ROI's and BM intensity average using MNO file 
+def analyze_MNO(selected_runs, ROI_list, data_dir, output_summary_file):
+	"""
+	Function to find counts in different ROI's for all selected runs
+
+	Parameters:
+		selected_runs (DataFrame): DataFrame containing selected run summary data.
+		ROI_list (array): Contains [Rectangular ROI limits [x0, x1, y0, y1]] [DataFrame column header for ROI sum output] [DataFrame column header for ROI sum err output]
+		data_dir (string): Name of directory containing McStas-format data files to be analyzed.
+		output_summary_file (string): Name of file containing output summary of analysis.
+
+	Returns:
+		selected_runs (DataFrame): DataFram now has extra column containing calculated ROI counts, BM intensity average.
+	"""
+
+	# If output_summary_file exists and has all the required data, load it instead of redoing analysis
+	if os.path.exists(output_summary_file):
+		# Load output_summary_file into a pandas DataFrame
+		output_summary = pd.read_csv(output_summary_file)
+		load_summary = True
+	
+		for (ROI, roi_string, roi_err_string) in ROI_list:
+			# Check if output_summary has column roi_string
+			if roi_string not in output_summary.columns:
+				print(f"Column '{roi_string}' not found in output_summary.")
+				load_summary = False
+	
+			# Check if output_summary has column roi_err_string
+			if roi_err_string not in output_summary.columns:
+				print(f"Column '{roi_err_string}' not found in output_summary.")
+				load_summary = False
+	
+		# Check if output_summary has column 'BM Average Intensity'
+		if 'BM Average Intensity' not in output_summary.columns:
+			print("Column 'BM Average Intensity' not found in output_summary.")
+			load_summary = False
+	
+		runs = selected_runs['Run #']
+		# Check if output_summary['Run #'] has every run that can be found in runs
+		if not output_summary['Run #'].isin(runs).all():
+			print("Not all runs from selected_runs are present in output_summary['Run #'].")
+			load_summary = False
+
+		# If all checks pass
+		if load_summary == True:
+			print(f'Loading data from {output_summary_file}')
+			return output_summary
+	
+	else:	# Redo the analysis
+
+		selected_runs_appended = selected_runs.copy()
+	
+		selected_files = []
+	
+		# Iterate through selected runs to find corresponding MNO files
+		for run_number in selected_runs['Run #']:
+			# Construct file path for each run
+			file_path = os.path.join(settings.mno_dir, f'MNO_GPSANS_{run_number}.txt')
+			# Check if file exists
+			if os.path.exists(file_path):
+				selected_files.append(file_path)
+			else:
+				print(f"File not found for run {run_number}: {file_path}")
+	
+		print(f' ======== Converting MNO Files ========')
+	
+		for file in selected_files:
+			# Extract run number from file name
+			run_number = (os.path.basename(file).split('_')[2]).split('.')[0]
+	
+			processed_outfile = os.path.join(settings.processed_outdir, f'reduced_xbin_{run_number}.txt')
+	
+			if not os.path.exists(processed_outfile):
+				# Preprocess MNO datafiles
+				run_duration = os.system(f"python3 preprocess/extract_duration.py {settings.run_summary_file} {run_number}")
+				detIDmap_file = os.path.join(settings.data_dir, 'DetIDmap.csv')
+	
+				os.system(f"./MNO_to_intensity.out {file} {detIDmap_file} {processed_outfile} {run_duration}")
+	
+		print(f' ======== MNO Conversion Done ========')
+		
+		print(ROI_list)
+		
+		print(f' ======== Analyzing Runs ========')
+	
+		for file in selected_files:
+	
+			# -------------
+			# ROI Sums
+			# -------------
+			roi_count_str = '	 '
+	
+			# Find counts within rectangular ROI limits for each MNO file
+			for (ROI, roi_string, roi_err_string) in ROI_list:
+				# Extract run number from file name
+				run_number = (os.path.basename(file).split('_')[2]).split('.')[0]
+				processed_outfile = os.path.join(settings.processed_outdir, f'reduced_xbin_{run_number}.txt')
+				
+				ROI_sum, ROI_sum_err = calculate_roi_sum(processed_outfile, square=ROI, show=False)
+	
+				# Update selected_runs_appended with ROI sum for corresponding run
+				selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_string] = ROI_sum
+				selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_err_string] = ROI_sum_err
+	
+				roi_count_str = f'{roi_count_str}{roi_string} Counts: {ROI_sum} ± {ROI_sum_err}\n	 '
+	
+			# -------------
+			# BM Intensity 
+			# -------------
+			BM_intensity = BM_intensity_MNO(file) # Intensity per 16667us 
+			BM_intensity_avg = np.mean(BM_intensity[:,1])
+	
+			# Update selected_runs_appended with bm_intensity_avg for corresponding run
+			selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity'] = BM_intensity_avg 
+	
+			print(f'{run_number} BM Intensity Avg: {BM_intensity_avg}\n{roi_count_str}')
+	
+		print(f' ======== Run Analysis Done. ========')
+
+		# Save selected_runs_appended to output_summary_file
+		selected_runs_appended.to_csv(output_summary_file)
 	
 	return selected_runs_appended

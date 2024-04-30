@@ -1,8 +1,8 @@
 # James Rogers
 # 4-28-2024
 # Analyze runs for given |B| all at the same time:
-#   output counts per second/ ROI for each ROI
-#   output summary plots for each |B| value
+#	output counts per second/ ROI for each ROI
+#	output summary plots for each |B| value
 
 import numpy as np
 import matplotlib.pyplot as plt 
@@ -70,22 +70,53 @@ def main():
 	# Parse start time
 	run_summary['Start Time Elapsed [Hours]'], run_summary['Duration [Hours]'] = parse_start_time(run_summary)
 	
+	# -----------------------
 	# Filter and select runs 
+	# -----------------------
+
 	selected_runs = run_summary.copy()
 	selected_runs = selected_runs[selected_runs['Field'].isin(settings.B_select)]				# Select runs by |B| values in B_select list
 	selected_runs = selected_runs[selected_runs['Duration [Hours]'] > settings.min_duration]	# Filter runs by minimum duration
 	selected_runs = selected_runs[selected_runs['Ramping'] == settings.ramping_included] 		# Choose whether to include ramping runs
 
+	# -----------------------
+	# Calculate quantities and store to DataFrame
+	# -----------------------
+
 	# Calculate counts/ ROI for each ROI definition
 	ROI_list = [[settings.ROI_0, 'ROI 0', 'ROI 0 Err'],
 				[settings.ROI_1, 'ROI 1', 'ROI 1 Err'],
 				[settings.ROI_2, 'ROI 2', 'ROI 2 Err']]
-	selected_runs = find_ROI_counts_MNO(selected_runs, ROI_list, settings.data_dir)
-	#selected_runs = find_ROI_counts(selected_runs, ROI_list, settings.data_dir)
+
+	# Calculate ROI counts and BM intensity from MNO at the same time
+	selected_runs = analyze_MNO(selected_runs, ROI_list, settings.data_dir, settings.output_summary_file)
+
+	# Calculate only ROI counts or BM intensity
+	#selected_runs = find_ROI_counts_MNO(selected_runs, ROI_list, settings.data_dir)
+	#selected_runs = find_BM_intensity_MNO(selected_runs)
 	
-	# Plot counts vs. time for selected runs
+	# -----------------------
+	# Plot outputs
+	# -----------------------
+
+	# Plot counts vs. time for selected runs, with |B| field colored
 	plot_counts_vs_time(selected_runs, ROI_list)
 	plot_countrates_vs_time(selected_runs, ROI_list)
+
+
+	# TODO plot_countrates_vs_time_normalized
+	# Plot BM Intensity-corrected countrates
+	#plot_countrates_vs_time_normalized(selected_runs)
+
+
+	# Plot BM Avg Intensity Variation across selected runs 
+	plot_BM_intensity_vs_time(selected_runs)
+
+
+
+	# TODO: finish this function
+	# Plot BM Intensity vs Time for a single run
+	#plot_BM_intensity_run(89847)
 
 	# TODO: plot counts vs time for each ROI for given |B| value (x: time, y: counts, color: ROI def)
 	#plot_countrates_vs_time_B(selected_runs)

@@ -38,7 +38,7 @@ contact: jroger87@vols.utk.edu
 This research used resources at the High Flux Isotope Reactor, a DoE Office of Science User Facility operated by the Oak Ridge National Laboratory.
 
 ## 4 References
-[1] Gonzalez, Francisco M., Cary Rock, Leah J. Broussard, Lisa DeBeer-Schmitt, Matthew J. Frost, Lawrence Heilbronn, Erik B. Iverson, et al. “Improved Limits on n \rightarrow n’ Transformation from the Spallation Neutron Source,” 2024.
+[1] Gonzalez, Francisco M., Cary Rock, Leah J. Broussard, Lisa DeBeer-Schmitt, Matthew J. Frost, Lawrence Heilbronn, Erik B. Iverson, et al. “Improved Limits on n \rightarrow n’ Transformation from the Spallation Neutron Source,” 2024.  
 [2] Z. Berezhiani, P. Ciarcelluti, D. Comelli, and F. L. Villante, International Journal of Modern Physics D 14, 107(2005), arXiv:0312605 [astro-ph]. 
 
 ## License  
