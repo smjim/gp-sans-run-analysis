@@ -127,7 +127,7 @@ def calculate_roi_sum(file, square=None, circle=None, oval=None, show=False):
 	
 	return roi_sum, roi_sum_err
 
-def BM_intensity_MNO(MNO_filename):
+def B_BM_intensity_MNO(MNO_filename):
 	"""
 	Extract BM intensity data from a TSV .dat file.
 
@@ -136,10 +136,14 @@ def BM_intensity_MNO(MNO_filename):
 
 	Returns:
 		np.ndarray: 2D array containing time and counts.
+		np.ndarray: 2D array containing time and |B| readback value [Gauss].
 	"""
 	# Initialize lists to store time and intensity values
-	time_list = []
+	time_list_1 = []
 	intensity_list = []
+
+	time_list_2 = []
+	B_list = []
 
 	# Open the file and read line by line
 	with open(MNO_filename, 'r') as file:
@@ -151,23 +155,34 @@ def BM_intensity_MNO(MNO_filename):
 		for line in file:
 			# Split the line by comma to extract values
 			values = line.strip().split(',')
-			# Check if the Detector ID is 2048
+			# Check if the Detector ID is 2048 (BM countrate per 16667us)
 			if values[2].strip() == '2048':
 				# Extract time and intensity values
 				time = float(values[1].strip())  # Relative Time
 				intensity = float(values[3].strip())  # Value
 				# Append time and intensity to the respective lists
-				time_list.append(time)
+				time_list_1.append(time)
 				intensity_list.append(intensity)
+			# Check if the Detector ID is 2050 (Magnetic Field Readback value in Gauss)
+			if values[2].strip() == '2050':
+				# Extract time and intensity values
+				time = float(values[1].strip())  # Relative Time
+				B_value = float(values[3].strip())  # Value
+				# Append time and intensity to the respective lists
+				time_list_2.append(time)
+				B_list.append(B_value)
 
 	# Convert lists to numpy arrays
-	time_array = np.array(time_list)
+	time_array_1 = np.array(time_list_1)
+	time_array_2 = np.array(time_list_2)
 	intensity_array = np.array(intensity_list)
+	B_array = np.array(B_list)
 
 	# Combine time and intensity arrays column-wise
-	data_array = np.column_stack((time_array, intensity_array))
+	intensity_array = np.column_stack((time_array_1, intensity_array))
+	B_array = np.column_stack((time_array_2, B_array))
 
-	return data_array
+	return intensity_array, B_array
 
 # Calculate sum within ROI for set of "selected runs" (Pandas DataFrame)
 def find_ROI_counts(selected_runs, ROI_list, data_dir):
@@ -426,7 +441,7 @@ def analyze_MNO(selected_runs, ROI_list, data_dir, output_summary_file):
 		# -------------
 		# BM Intensity 
 		# -------------
-		BM_intensity = BM_intensity_MNO(file)						# Intensity per 16667us 
+		BM_intensity, B_value = B_BM_intensity_MNO(file)			# Intensity per 16667us 
 		BM_intensity_err = np.sqrt(BM_intensity[:,1]) 
 		BM_intensity[:,1] = BM_intensity[:,1] * (3600/(1.6667e-6))	# Intensity per 1 hr (measured at each tick)
 		BM_intensity_err = BM_intensity_err * (3600/(1.6667e-6))

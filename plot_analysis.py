@@ -4,6 +4,8 @@ import matplotlib
 
 import settings
 
+from analyze_MNO_files import *
+
 def plot_counts_vs_time(selected_runs, roi_list):
 	"""
 	Function to plot the 'Total Counts' value as a function of 'Start Time' for selected runs.
@@ -72,9 +74,7 @@ def plot_countrates_vs_time(selected_runs, roi_list):
 		plt.savefig(f'{settings.output_dir}{roi_str}_countRate_plot.pdf', format='pdf')
 		plt.show()
 
-# TODO make this!
-#plot_BM_intensity_run(89847)
-def plot_BM_intensity_run(run_string):
+def plot_run_stats(run_string, rebin=1000, showB=False):
 	"""
 	Function to plot the `Beam Monitor` (ID 2048) values as a function of time for a selected run.
 
@@ -82,27 +82,78 @@ def plot_BM_intensity_run(run_string):
 		run_string (string): Selected run for plotting
 	"""
 
-	#filename = 
-	# TODO make this!
+	# Get file_path from run number
+	file_path = os.path.join(settings.mno_dir, f'MNO_GPSANS_{run_string}.txt')
 
-	plt.figure(figsize=(10, 6))
+	# Load data from file_path using functions in analyze_MNO
+	BM_intensity, B_value = B_BM_intensity_MNO(file_path)
 
-	duration = selected_runs['Duration [Hours]']
-	midpoint_time = selected_runs['Start Time Elapsed [Hours]'] + duration/ 2
+	# Rebin and propagate error
+	if rebin is not False:
+		def rebin_histogram(hist, new_size):
+			old_size = hist.size
+	
+			if new_size >= old_size:
+				raise ValueError("The new size should be smaller than the old size.")
+	
+			if old_size % new_size != 0:
+				rem = old_size % new_size
+				print("! New size is not a factor of old size, cutting out last ", rem, " entries")
+				hist = hist[:-rem]
+	
+			factor = old_size // new_size
+	
+			# Reshape the histogram array to a 2D array
+			hist_2d = hist.reshape((new_size, factor))
+	
+			# Sum the values in each bin of the new histogram
+			rebinned_hist = np.sum(hist_2d, axis=1)
+	
+			return rebinned_hist
 
-	BM_avg_intensity, BM_avg_intensity_err = runs_for_B['BM Average Intensity'], runs_for_B['BM Average Intensity Err']
+		# Rebin counts
+		rebinned_counts = rebin_histogram(BM_intensity[:,1], rebin)											# Sum col-wise
+		rebinned_time = rebin_histogram(BM_intensity[:-1,0], rebin)/ (BM_intensity[:-1,0].size // rebin)	# Average col-wise
+		rebinned_counts_err = np.sqrt(rebin_histogram(np.square(np.sqrt(BM_intensity[:,1])), rebin))		# sqrt of sum col-wise of squared values
 
-	plt.errorbar(midpoint_time, BM_avg_intensity, xerr=duration/ 2, yerr=BM_avg_intensity_err,
-			marker='o', markersize=3, capsize=2, fmt=' ', color='black', label=f'BM Average Intensity for Selected Runs')
+		# Rebin |B| Readback 
+		#rebinned_counts = rebin_histogram(B_value[:,1], rebin)									# Sum col-wise
+		#rebinned_time = rebin_histogram(B_value[:-1,0], rebin)/ (B_value[:-1,0].size // rebin)	# Average col-wise
+		#rebinned_counts_err = np.sqrt(rebin_histogram(np.square(np.sqrt(B_value[:,1])), rebin))	# sqrt of sum col-wise of squared values
 
-	plt.xlabel('Start Time [Hrs]')
-	plt.ylabel(roi_str + ' Count Rate [$hours^{-1}$]')
-	plt.title('Count Rate vs. Start Time')
-	plt.legend(loc='lower right', fontsize=settings.fontsize*0.8)
+		plt.figure(figsize=(10, 6))
 
-	plt.tight_layout()
-	plt.savefig(f'{settings.output_dir}_BM_avg_intensity_plot.pdf', format='pdf')
-	plt.show()
+		plt.errorbar(rebinned_time, rebinned_counts, yerr=rebinned_counts_err,
+				marker='o', markersize=3, capsize=2, fmt=' ', color='black', label=f'BM Intensity for Run {run_string}')
+	
+		plt.xlabel('Time [s]')
+		plt.ylabel('BM Count Rate [$16667 \mu s^{-1}$]')
+		plt.title('BM Count Rate vs |B| Value')
+		plt.legend(loc='lower right', fontsize=settings.fontsize*0.8)
+	
+		plt.tight_layout()
+		plt.savefig(f'{settings.output_dir}BM_countRate_{run_string}_plot.pdf', format='pdf')
+		plt.show()
+
+	else:
+		 if showB:
+		 	print('you dont want to rebin and you want to show the |B| readback at the same time')
+#		fig, (ax_counts, ax_b) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+#	
+#		ax_counts.errorbar(BM_intensity[:,0], BM_intensity[:,1], yerr=np.sqrt(BM_intensity[:,1]),
+#				marker='o', markersize=3, capsize=2, fmt=' ', color='black', label=f'BM Intensity for Run {run_string}')
+#		ax_b.scatter(B_value[:,0], B_value[:,1], 
+#				color='black', label=f'|B| value for Run {run_string}')
+#	
+#		plt.xlabel('Time [s]')
+#		ax_counts.set_ylabel('BM Count Rate [$16667 \mu s^{-1}$]')
+#		ax_counts.set_ylabel('|B| Readback Value [Gauss]')
+#		plt.suptitle('BM Count Rate vs |B| Value')
+#		ax_counts.legend(loc='lower right', fontsize=settings.fontsize*0.8)
+#	
+#		plt.tight_layout()
+#		plt.savefig(f'{settings.output_dir}_BM_countRate_{run_string}_plot.pdf', format='pdf')
+#		plt.show()
 
 def plot_BM_intensity_vs_time(selected_runs):
 	"""
@@ -169,8 +220,8 @@ def plot_countrates_vs_time_normalized(selected_runs, roi_list):
 					fmt=' ', marker='o', markersize=5, capsize=2, color='black')
 
 		plt.xlabel('Start Time [Hrs]')
-		ax_counts.set_ylabel(roi_str + ' Count Rate/ BM Count Rate [$hours^{-1}$]')
-		ax_bm.set_ylabel('BM Average Count Rate [$hours^{-1}$]')
+		ax_counts.set_ylabel(roi_str + ' Count Rate/ BM Count Rate', fontsize=settings.fontsize*0.6)
+		ax_bm.set_ylabel('BM Average Count Rate [$hours^{-1}$]', fontsize=settings.fontsize*0.6)
 		plt.suptitle('BM Normalized Count Rate vs. Start Time')
 
 		ax_counts.legend(loc='lower right', fontsize=settings.fontsize*0.8)

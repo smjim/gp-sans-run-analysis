@@ -104,14 +104,13 @@ def main():
 	plot_countrates_vs_time(selected_runs, ROI_list)
 
 	# Plot BM Intensity-corrected countrates
-	#plot_countrates_vs_time_normalized(selected_runs, ROI_list)
+	plot_countrates_vs_time_normalized(selected_runs, ROI_list)
 
 	# Plot BM Avg Intensity Variation across selected runs 
 	plot_BM_intensity_vs_time(selected_runs)
 
-	# TODO: finish this function
 	# Plot BM Intensity vs Time for a single run
-	#plot_BM_intensity_run(89847)
+	plot_run_stats(89847, rebin=1000, showB=False)
 
 	# TODO: plot counts vs time for each ROI for given |B| value (x: time, y: counts, color: ROI def)
 	#plot_countrates_vs_time_B(selected_runs)
