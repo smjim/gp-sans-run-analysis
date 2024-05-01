@@ -100,24 +100,25 @@ def main():
 	# -----------------------
 
 	# Plot counts vs. time for selected runs, with |B| field colored
-	plot_counts_vs_time(selected_runs, ROI_list)
-	plot_countrates_vs_time(selected_runs, ROI_list)
+	#plot_counts_vs_time(selected_runs, ROI_list)
+	#plot_countrates_vs_time(selected_runs, ROI_list, fit=True)
 
 	# Plot BM Intensity-corrected countrates
-	plot_countrates_vs_time_normalized(selected_runs, ROI_list)
+	plot_countrates_vs_time_normalized(selected_runs, ROI_list, fit=True, showBM=False)
 
 	# Plot BM Avg Intensity Variation across selected runs 
-	plot_BM_intensity_vs_time(selected_runs)
+	#plot_BM_intensity_vs_time(selected_runs)
 
 	# Plot BM Intensity vs Time for a single run
-	plot_run_stats(89847, rebin=1000, showB=False)
+	#plot_run_stats(89847, rebin=1000, showB=False)
+
+	# Plot summary of ROI counts for each |B| value over entire experiment
+	# TODO: complete this function
+	#plot_effect_analysis(selected_runs, ROI_list)	
 
 	# TODO: plot counts vs time for each ROI for given |B| value (x: time, y: counts, color: ROI def)
 	#plot_countrates_vs_time_B(selected_runs)
 	# (not super useful tbh)
-
-	# TODO: plot summary of ROI counts for each |B| value over entire experiment (x: |B|, y: counts, color: ROI def)
-	# (very useful - summary of effect)
 
 if __name__ == "__main__":
 	# Plot settings

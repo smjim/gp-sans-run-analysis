@@ -20,4 +20,4 @@ B_select = [-4.8, -3.6, -2.4, 0, 2.4, 3.6, 4.8] # |B| Field [T]
 ramping_included = False 
 
 ## Plotting variables
-fontsize=18
+fontsize=14

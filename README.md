@@ -4,17 +4,16 @@ Analysis of |B| variation during January 2024 nn' experiment at GP-SANS instrume
 
 ## Table of Contents
 1. Description   
-	1.1 Background
-	1.2 GP-SANS Analysis Scripts
-2. Usage  
-3. Author(s) and Acknowledgement  
+	1.1 Background  
+	1.2 GP-SANS Analysis Scripts  
+2. Usage   
+3. Author(s) and Acknowledgement   
 4. References  
 
 ## 1 Description
 This repository contains scripts that are 
 
 ### 1.1 Mirror Matter Search at HFIR 
-<!-- Background -->
 ![doc/nnprime-deltam-probability.png](./doc/nnprime-deltam-probability.png)  
 The figure above shows the simulated probability of neutron regeneration (color scale) as a function of possible $\delta m$ and mixing angle $\theta_0$ in the SNS 2020 nn' experiment [1] for a 4.7 T Magnetic Field.
 The January 2024 nn' experiment at HFIR aims to continue this search, varying |B| to hopefully observe a different countrate, as this may suggest the existence of mirror matter [2].
