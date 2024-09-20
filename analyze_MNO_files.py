@@ -5,6 +5,28 @@ import os
 
 import settings
 
+def weighted_mean(y, yerr):
+	mean = np.sum(y/ yerr**2) / np.sum(1/ yerr**2)
+	mean_err = np.sqrt(1/ np.sum(1/ yerr**2))
+	return mean, mean_err
+
+def calculate_rms(data, mean):
+	"""
+	Calculate the root mean square (RMS) of a 1D array with error bars.
+	
+	Parameters:
+		data (array-like): The 1D array of data points.
+		errors (array-like): The 1D array of corresponding error bars.
+	
+	Returns:
+		float: The root mean square (RMS) value.
+	"""
+
+	residuals = data - mean
+	rms = np.sqrt(np.sum(np.square(residuals))/ (data.size - 1))
+	
+	return rms
+
 # Calculate Sum within ROI for given ROI and input file 
 def calculate_roi_sum(file, square=None, circle=None, oval=None, show=False):
 
@@ -127,7 +149,7 @@ def calculate_roi_sum(file, square=None, circle=None, oval=None, show=False):
 	
 	return roi_sum, roi_sum_err
 
-def B_BM_intensity_MNO(MNO_filename):
+def extract_from_MNO(MNO_filename):
 	"""
 	Extract BM intensity data from a TSV .dat file.
 
@@ -137,6 +159,7 @@ def B_BM_intensity_MNO(MNO_filename):
 	Returns:
 		np.ndarray: 2D array containing time and counts.
 		np.ndarray: 2D array containing time and |B| readback value [Gauss].
+		np.ndarray: 2D array containing time and counts in GPSANS tubes. 
 	"""
 	# Initialize lists to store time and intensity values
 	time_list_1 = []
@@ -144,6 +167,9 @@ def B_BM_intensity_MNO(MNO_filename):
 
 	time_list_2 = []
 	B_list = []
+
+	time_list_3 = []
+	GPSANS_list = []
 
 	# Open the file and read line by line
 	with open(MNO_filename, 'r') as file:
@@ -155,34 +181,41 @@ def B_BM_intensity_MNO(MNO_filename):
 		for line in file:
 			# Split the line by comma to extract values
 			values = line.strip().split(',')
+			tube = int(values[2].strip())
+			time = float(values[1].strip())
+			value = float(values[3].strip())
+
 			# Check if the Detector ID is 2048 (BM countrate per 16667us)
-			if values[2].strip() == '2048':
-				# Extract time and intensity values
-				time = float(values[1].strip())  # Relative Time
-				intensity = float(values[3].strip())  # Value
-				# Append time and intensity to the respective lists
+			if tube == 2048:
 				time_list_1.append(time)
-				intensity_list.append(intensity)
+				intensity_list.append(value)
 			# Check if the Detector ID is 2050 (Magnetic Field Readback value in Gauss)
-			if values[2].strip() == '2050':
-				# Extract time and intensity values
-				time = float(values[1].strip())  # Relative Time
-				B_value = float(values[3].strip())  # Value
-				# Append time and intensity to the respective lists
+			if tube == 2050:
 				time_list_2.append(time)
-				B_list.append(B_value)
+				B_list.append(value)
+			# Check if the Detector ID is in [0, 191] (GP-SANS tubes)
+			if 0 <= tube and tube <= 191:
+				time_list_3.append(time)
+				GPSANS_list.append(1)
+				#GPSANS_list.append(value) # this will give the y position of the detection
 
 	# Convert lists to numpy arrays
 	time_array_1 = np.array(time_list_1)
-	time_array_2 = np.array(time_list_2)
 	intensity_array = np.array(intensity_list)
+	intensity_err_array = np.sqrt(intensity_array) # Statistical error from countrate
+
+	time_array_2 = np.array(time_list_2)
 	B_array = np.array(B_list)
 
-	# Combine time and intensity arrays column-wise
-	intensity_array = np.column_stack((time_array_1, intensity_array))
-	B_array = np.column_stack((time_array_2, B_array))
+	time_array_3 = np.array(time_list_3)
+	GPSANS_array = np.array(GPSANS_list)
 
-	return intensity_array, B_array
+	# Combine arrays column-wise
+	intensity_array = np.column_stack((time_array_1, intensity_array, intensity_err_array))
+	B_array = np.column_stack((time_array_2, B_array))
+	GPSANS_array = np.column_stack((time_array_3, GPSANS_array))
+
+	return intensity_array, B_array, GPSANS_array
 
 # Calculate sum within ROI for set of "selected runs" (Pandas DataFrame)
 def find_ROI_counts(selected_runs, ROI_list, data_dir):
@@ -318,11 +351,19 @@ def find_BM_intensity_MNO(selected_runs):
 		# Extract run number from file name
 		run_number = (os.path.basename(file).split('_')[2]).split('.')[0]
 		
-		BM_intensity = BM_intensity_MNO(file) # Intensity per 16667us 
-		BM_intensity_avg = np.mean(BM_intensity[:,1])
+		# -------------
+		# BM Intensity 
+		# -------------
+		BM_intensity, B_value, GPSANS_counts = extract_from_MNO(file)	# Intensity per 16667us 
+		BM_intensity, BM_intensity_err = BM_intensity[:,1], np.sqrt(BM_intensity[:,1]) 
+
+		BM_intensity_avg = np.mean(BM_intensity)								# Average Intensity [counts/ tick]
+		BM_intensity_avg_err = calculate_rms(BM_intensity, BM_intensity_avg)	# Err on Average Intensity [counts/ tick]
 
 		# Update selected_runs_appended with bm_intensity_avg for corresponding run
-		selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity'] = BM_intensity_avg 
+		selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity [per tick]'] = BM_intensity_avg 
+		selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity Err [per tick]'] = BM_intensity_avg_err 
+
 		print(f'{run_number} BM Intensity Avg: {BM_intensity_avg}')
 	print(f' ======== BM Intensity Analysis Done. ========')
 	
@@ -360,12 +401,12 @@ def analyze_MNO(selected_runs, ROI_list, data_dir, output_summary_file):
 				print(f"Column '{roi_err_string}' not found in output_summary.")
 				load_summary = False
 	
-		# Check if output_summary has column 'BM Average Intensity'
-		if 'BM Average Intensity' not in output_summary.columns:
-			print("Column 'BM Average Intensity' not found in output_summary.")
+		# Check if output_summary has column 'BM Average Intensity [per tick]'
+		if 'BM Average Intensity [per tick]' not in output_summary.columns:
+			print("Column 'BM Average Intensity [per tick]' not found in output_summary.")
 			load_summary = False
-		if 'BM Average Intensity Err' not in output_summary.columns:
-			print("Column 'BM Average Intensity Err' not found in output_summary.")
+		if 'BM Average Intensity Err [per tick]' not in output_summary.columns:
+			print("Column 'BM Average Intensity Err [per tick]' not found in output_summary.")
 			load_summary = False
 	
 		runs = selected_runs['Run #']
@@ -436,22 +477,21 @@ def analyze_MNO(selected_runs, ROI_list, data_dir, output_summary_file):
 			selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_string] = ROI_sum
 			selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), roi_err_string] = ROI_sum_err
 
-			roi_count_str = f'{roi_count_str}{roi_string} Total Counts: {ROI_sum} ± {ROI_sum_err}\n	 '
+			roi_count_str = f'{roi_count_str}{roi_string} Total Counts: {int(ROI_sum)} ± {ROI_sum_err:.2f}\n	 '
 
 		# -------------
 		# BM Intensity 
 		# -------------
-		BM_intensity, B_value = B_BM_intensity_MNO(file)			# Intensity per 16667us 
-		BM_intensity_err = np.sqrt(BM_intensity[:,1]) 
-		BM_intensity[:,1] = BM_intensity[:,1] * (3600/(1.6667e-6))	# Intensity per 1 hr (measured at each tick)
-		BM_intensity_err = BM_intensity_err * (3600/(1.6667e-6))
+		BM_intensity, B_value, GPSANS_counts = extract_from_MNO(file)	# Intensity per 16667us 
+		BM_intensity, BM_intensity_err = BM_intensity[:,1], np.sqrt(BM_intensity[:,1]) 
 
-		BM_intensity_avg = np.mean(BM_intensity[:,1]) 				# Average Intensity [counts/ hr]
-		BM_intensity_avg_err = np.sqrt(np.sum(np.square(BM_intensity_err)))/ np.size(BM_intensity_err)
+		BM_intensity_avg, BM_intensity_avg_err = weighted_mean(BM_intensity, BM_intensity_err)	# Average Intensity [counts/ tick]
+		#BM_intensity_avg = np.mean(BM_intensity)								# Average Intensity [counts/ tick]
+		#BM_intensity_avg_err = calculate_rms(BM_intensity, BM_intensity_avg)	# Err on Average Intensity [counts/ tick]
 
 		# Update selected_runs_appended with bm_intensity_avg for corresponding run
-		selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity'] = BM_intensity_avg 
-		selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity Err'] = BM_intensity_avg_err 
+		selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity [per tick]'] = BM_intensity_avg 
+		selected_runs_appended.loc[selected_runs_appended['Run #'] == int(run_number), 'BM Average Intensity Err [per tick]'] = BM_intensity_avg_err 
 
 		print(f'{run_number} BM Intensity Avg: {BM_intensity_avg:.3e} ± {BM_intensity_avg_err:.3e} Counts/ Hour\n{roi_count_str}')
 
